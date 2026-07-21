@@ -1,6 +1,6 @@
-// VONANA — Milestone 1 schema
-// Only the foundation needed for authentication + profile is modelled here.
-// Post, Comment, Marketplace, Group and Shop models belong to later milestones.
+// VONANA — Milestone 1 + 2 schema
+// M1: authentication + profile foundation
+// M2: social core (posts, follows, reactions, comments, notifications)
 
 generator client {
   provider = "prisma-client-js"
@@ -51,6 +51,42 @@ enum Province {
   NIASSA
 }
 
+enum PostVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+/// Future ownership beyond personal accounts (Pages / Groups / Businesses).
+/// M2 only creates USER-owned posts; other values are reserved.
+enum PostOwnerType {
+  USER
+  PAGE
+  GROUP
+  BUSINESS
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  CELEBRATE
+  SUPPORT
+  LAUGH
+  WOW
+  SAD
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  POST_REACTION
+  POST_COMMENT
+}
+
 // ------------------------------------------------------------------
 // Core user model
 // ------------------------------------------------------------------
@@ -82,14 +118,24 @@ model User {
   accounts Account[]
   sessions Session[]
 
+  posts     Post[]
+  comments  Comment[]
+  reactions Reaction[]
+
+  following Follow[] @relation("UserFollowing")
+  followers Follow[] @relation("UserFollowers")
+
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsActed    Notification[] @relation("NotificationActor")
+
   @@index([role])
+  @@index([username])
+  @@index([fullName])
   @@map("users")
 }
 
 // ------------------------------------------------------------------
 // Auth.js (NextAuth) required models
-// Kept close to the standard Prisma adapter shape so future OAuth
-// providers (Google, Facebook, etc.) can be added without a migration.
 // ------------------------------------------------------------------
 
 model Account {
@@ -132,11 +178,6 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ------------------------------------------------------------------
-// Password reset (separate from Auth.js verification tokens so email
-// verification and password reset flows can evolve independently)
-// ------------------------------------------------------------------
-
 model PasswordResetToken {
   id        String   @id @default(cuid())
   email     String
@@ -146,4 +187,124 @@ model PasswordResetToken {
 
   @@index([email])
   @@map("password_reset_tokens")
+}
+
+// ------------------------------------------------------------------
+// Social core (Milestone 2)
+// ------------------------------------------------------------------
+
+model Post {
+  id         String         @id @default(cuid())
+  authorId   String
+  content    String         @db.Text
+  visibility PostVisibility @default(PUBLIC)
+
+  /// Reserved for multi-owner posts (pages/groups/businesses). M2: always USER.
+  ownerType PostOwnerType @default(USER)
+  /// When ownerType is USER, this mirrors authorId. Future owners use their own IDs.
+  ownerId   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media     PostMedia[]
+  reactions Reaction[]
+  comments  Comment[]
+
+  @@index([authorId, createdAt])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([visibility])
+  @@map("posts")
+}
+
+model PostMedia {
+  id        String    @id @default(cuid())
+  postId    String
+  url       String
+  type      MediaType
+  width     Int?
+  height    Int?
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, position])
+  @@map("post_media")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  postId    String
+  userId    String
+  type      ReactionType @default(LIKE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("reactions")
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String    @db.Text
+  /// Reserved for threading; M2 uses top-level comments only (parentId null).
+  parentId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  post   Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  actorId     String?
+  type        NotificationType
+  /// e.g. "post", "comment", "user" — keeps the model open for future types
+  entityType  String?
+  entityId    String?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User? @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+  @@map("notifications")
 }

@@ -12,12 +12,12 @@ export type NavItem = {
 export const primaryNav: NavItem[] = [
   { label: 'Início', href: '/home', icon: Home, implemented: true },
   { label: 'Explorar', href: '/explore', icon: Compass, implemented: false },
-  { label: 'Pessoas', href: '/people', icon: Users, implemented: false },
+  { label: 'Pessoas', href: '/people', icon: Users, implemented: true },
   { label: 'Comunidades', href: '/communities', icon: LayoutGrid, implemented: false },
   { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag, implemented: false },
   { label: 'Lojas', href: '/shops', icon: Store, implemented: false },
   { label: 'Mensagens', href: '/messages', icon: MessageCircle, implemented: false },
-  { label: 'Notificações', href: '/notifications', icon: Bell, implemented: false },
+  { label: 'Notificações', href: '/notifications', icon: Bell, implemented: true },
   { label: 'Perfil', href: '/profile', icon: UserCircle, implemented: true },
 ];
 
@@ -25,7 +25,7 @@ export const primaryNav: NavItem[] = [
 export const mobileNav: NavItem[] = [
   { label: 'Início', href: '/home', icon: Home, implemented: true },
   { label: 'Explorar', href: '/explore', icon: Compass, implemented: false },
-  { label: 'Criar', href: '/create', icon: PlusCircle, implemented: false },
+  { label: 'Criar', href: '/create', icon: PlusCircle, implemented: true },
   { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag, implemented: false },
   { label: 'Perfil', href: '/profile', icon: UserCircle, implemented: true },
 ];

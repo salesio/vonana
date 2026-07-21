@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { TopBar } from '@/components/layout/TopBar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
+import { prisma } from '@/lib/prisma';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -12,6 +13,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) {
     redirect('/entrar');
   }
+
+  const unreadNotifications = await prisma.notification.count({
+    where: { recipientId: session.user.id, readAt: null },
+  });
 
   return (
     <div className="flex min-h-screen bg-offwhite dark:bg-navy-700">
@@ -23,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             username: session.user.username,
             avatarUrl: session.user.avatarUrl,
           }}
+          unreadNotifications={unreadNotifications}
         />
         <div className="flex flex-1">
           <main className="w-full flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-8">

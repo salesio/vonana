@@ -14,3 +14,6 @@ tsconfig.tsbuildinfo
 !.vscode/extensions.json
 tmp-*
 *.mts.bak
+# User uploads (local media storage)
+/public/uploads
+!/public/uploads/.gitkeep

@@ -1,4 +1,6 @@
+import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
+import { Newspaper } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ProfileHeader } from '@/components/social/ProfileHeader';
@@ -8,20 +10,31 @@ import { Card } from '@/components/ui/Card';
 import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fetchUserPostsPage } from '@/features/posts/queries';
-import { getUserSocialStats } from '@/features/follow/queries';
-import { Newspaper } from 'lucide-react';
+import { getUserSocialStats, isFollowing } from '@/features/follow/queries';
 import { MOZAMBIQUE_PROVINCES } from '@/config/geography';
 
-export default async function ProfilePage() {
+export default async function PublicProfilePage({
+  params,
+}: {
+  params: { username: string };
+}) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user) return null;
+  const user = await prisma.user.findFirst({
+    where: { username: params.username.toLowerCase(), accountStatus: 'ACTIVE' },
+  });
+  if (!user) notFound();
 
-  const [stats, postsPage] = await Promise.all([
+  const isOwn = user.id === session.user.id;
+  const [stats, following, postsPage] = await Promise.all([
     getUserSocialStats(user.id),
-    fetchUserPostsPage({ profileUserId: user.id, viewerId: user.id, limit: 10 }),
+    isOwn ? Promise.resolve(false) : isFollowing(session.user.id, user.id),
+    fetchUserPostsPage({
+      profileUserId: user.id,
+      viewerId: session.user.id,
+      limit: 10,
+    }),
   ]);
 
   const posts = postsPage.items.map(serializePost);
@@ -29,12 +42,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <ProfileHeader
-        user={user}
-        stats={stats}
-        isOwn
-        isFollowing={false}
-      />
+      <ProfileHeader user={user} stats={stats} isOwn={isOwn} isFollowing={following} />
 
       <Tabs
         defaultTab="posts"
@@ -46,8 +54,8 @@ export default async function ProfilePage() {
               posts.length === 0 ? (
                 <EmptyState
                   icon={Newspaper}
-                  title="Ainda sem publicações"
-                  description="Partilhe a sua primeira actualização no feed."
+                  title="Sem publicações visíveis"
+                  description="Este utilizador ainda não partilhou publicações que possa ver."
                 />
               ) : (
                 <FeedList
