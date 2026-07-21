@@ -1,0 +1,48 @@
+# VONANA — Docker Compose
+#
+# Local development: only the "db" service is needed while Next.js runs
+# via `npm run dev` on the host. Run:  docker compose up -d db
+#
+# The "app" service builds the production image and is intended for
+# staging/production on the Ubuntu VPS (behind Nginx). Run:
+#   docker compose --profile production up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vonana_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vonana
+      POSTGRES_PASSWORD: vonana_dev_password
+      POSTGRES_DB: vonana
+    ports:
+      - '5432:5432'
+    volumes:
+      - vonana_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vonana']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vonana_app
+    restart: unless-stopped
+    profiles: ['production']
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://vonana:vonana_dev_password@db:5432/vonana?schema=public
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+
+volumes:
+  vonana_db_data:

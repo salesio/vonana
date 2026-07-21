@@ -1,0 +1,149 @@
+// VONANA — Milestone 1 schema
+// Only the foundation needed for authentication + profile is modelled here.
+// Post, Comment, Marketplace, Group and Shop models belong to later milestones.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------
+
+enum Role {
+  USER
+  CREATOR
+  SELLER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING
+}
+
+enum Gender {
+  FEMININO
+  MASCULINO
+  OUTRO
+  PREFIRO_NAO_DIZER
+}
+
+enum Province {
+  MAPUTO_CIDADE
+  MAPUTO_PROVINCIA
+  GAZA
+  INHAMBANE
+  SOFALA
+  MANICA
+  TETE
+  ZAMBEZIA
+  NAMPULA
+  CABO_DELGADO
+  NIASSA
+}
+
+// ------------------------------------------------------------------
+// Core user model
+// ------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String?
+
+  fullName    String
+  displayName String?
+  bio         String?
+  avatarUrl   String?
+  coverUrl    String?
+
+  gender      Gender?
+  dateOfBirth DateTime?
+  province    Province?
+  city        String?
+
+  role          Role          @default(USER)
+  accountStatus AccountStatus @default(ACTIVE)
+  emailVerified DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@index([role])
+  @@map("users")
+}
+
+// ------------------------------------------------------------------
+// Auth.js (NextAuth) required models
+// Kept close to the standard Prisma adapter shape so future OAuth
+// providers (Google, Facebook, etc.) can be added without a migration.
+// ------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ------------------------------------------------------------------
+// Password reset (separate from Auth.js verification tokens so email
+// verification and password reset flows can evolve independently)
+// ------------------------------------------------------------------
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}

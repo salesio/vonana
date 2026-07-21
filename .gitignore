@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+build
+dist
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+/prisma/dev.db
+tsconfig.tsbuildinfo
+.vscode/*
+!.vscode/extensions.json
+tmp-*
+*.mts.bak
